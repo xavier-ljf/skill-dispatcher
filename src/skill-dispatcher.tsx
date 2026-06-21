@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readdir, mkdir, lstat, readlink, realpath, symlink } from "node:fs/promises";
+import { readdir, readFile, mkdir, lstat, readlink, realpath, symlink } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import React, { useMemo, useState } from "react";
@@ -10,6 +10,19 @@ import { render, Box, Text, useApp, useInput } from "ink";
 interface Skill {
   name: string;
   path: string;
+  source?: string;
+}
+
+interface SkillLockEntry {
+  source: string;
+  sourceType: string;
+  skillPath: string;
+  computedHash: string;
+}
+
+interface SkillsLock {
+  version: number;
+  skills: Record<string, SkillLockEntry>;
 }
 
 type LinkStatus = "created" | "skipped" | "conflict" | "failed";
@@ -44,6 +57,19 @@ function resolveToolRoot(): string {
 
 // --- Skill discovery ---
 
+async function readSkillsLock(toolRoot: string): Promise<SkillsLock | null> {
+  const lockPath = path.join(toolRoot, "inventory", "skills-lock.json");
+  try {
+    const content = await readFile(lockPath, "utf8");
+    return JSON.parse(content) as SkillsLock;
+  } catch (error) {
+    if (isEnoent(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 async function discoverSkills(toolRoot: string): Promise<Skill[]> {
   const skillsDir = path.join(toolRoot, "inventory", ".agents", "skills");
 
@@ -57,13 +83,22 @@ async function discoverSkills(toolRoot: string): Promise<Skill[]> {
     throw error;
   }
 
+  const lock = await readSkillsLock(toolRoot);
+
   return entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => ({
       name: entry.name,
       path: path.join(skillsDir, entry.name),
+      source: lock?.skills?.[entry.name]?.source,
     }))
-    .sort((left, right) => left.name.localeCompare(right.name));
+    .sort((left, right) => {
+      const sourceCompare = (left.source ?? "").localeCompare(right.source ?? "");
+      if (sourceCompare !== 0) {
+        return sourceCompare;
+      }
+      return left.name.localeCompare(right.name);
+    });
 }
 
 // --- Linking ---
@@ -294,16 +329,27 @@ function SelectScreen({
   selectedNames: Set<string>;
   readOnly?: boolean;
 }) {
+  const hasSources = skills.some((skill) => skill.source);
+
   return (
     <Box flexDirection="column">
       <Text>{readOnly ? "Selected skills:" : "Select skills with Space, then press Enter."}</Text>
       {skills.map((skill, index) => {
         const focused = index === cursor;
         const selected = selectedNames.has(skill.name);
+        const showHeader =
+          hasSources &&
+          (index === 0 || skills[index - 1].source !== skill.source);
+
         return (
-          <Text key={skill.name} color={focused && !readOnly ? "cyan" : undefined}>
-            {focused && !readOnly ? ">" : " "} [{selected ? "x" : " "}] {skill.name}
-          </Text>
+          <React.Fragment key={skill.name}>
+            {showHeader && (
+              <Text color="yellow">{skill.source ?? "(ungrouped)"}</Text>
+            )}
+            <Text color={focused && !readOnly ? "cyan" : undefined}>
+              {focused && !readOnly ? ">" : " "} {hasSources ? "  " : ""}[{selected ? "x" : " "}] {skill.name}
+            </Text>
+          </React.Fragment>
         );
       })}
     </Box>
