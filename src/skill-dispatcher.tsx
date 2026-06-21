@@ -70,15 +70,14 @@ async function discoverSkills(toolRoot: string): Promise<Skill[]> {
 
 async function linkSkills(
   skills: Skill[],
-  destinationRoot: string,
+  destinationDir: string,
 ): Promise<LinkResult[]> {
   const linkType = process.platform === "win32" ? "junction" : "dir";
-  const destinationSkillsDir = path.join(destinationRoot, ".agents", "skills");
-  await mkdir(destinationSkillsDir, { recursive: true });
+  await mkdir(destinationDir, { recursive: true });
 
   const results: LinkResult[] = [];
   for (const skill of skills) {
-    const targetPath = path.join(destinationSkillsDir, skill.name);
+    const targetPath = path.join(destinationDir, skill.name);
     results.push(await linkOneSkill(skill, targetPath, linkType));
   }
   return results;

@@ -8,11 +8,7 @@ The tool expects skills to live beside the CLI under:
 inventory/.agents/skills/
 ```
 
-When it runs, it opens a terminal UI, lets you select one or more skills, asks for a destination path, then creates links under:
-
-```text
-<destination>/.agents/skills/
-```
+When it runs, it opens a terminal UI, lets you select one or more skills, asks for a destination path (defaulting to `<cwd>/.agents/skills/`), then creates links directly under the entered path.
 
 ## Behavior
 
@@ -33,41 +29,18 @@ The tool never copies skill directories.
 
 Install dependencies:
 
-```powershell
+```shell
 npm install
-```
-
-Run in development mode:
-
-```powershell
-npm run dev
 ```
 
 Build:
 
-```powershell
+```shell
 npm run build
 ```
 
 Run the built CLI:
 
-```powershell
+```shell
 node dist/skill-dispatcher.js
 ```
-
-Run tests:
-
-```powershell
-npm test
-```
-
-## Project Layout
-
-```text
-src/
-  skill-dispatcher.tsx   Single-file CLI: skill discovery, linking, and Ink TUI
-```
-
-## Local Skill Inventory
-
-The repository keeps `.agents/skills/.gitkeep` so the expected inventory directory exists. Actual skill directories under `.agents/skills/` are ignored by Git, so you can keep a local skill collection there without committing it.
