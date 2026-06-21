@@ -17,7 +17,7 @@ pnpm-debug.log*
 !.env.example
 
 # Local skill inventory
-inventory/.agents/skills/*
+inventory/*
 !inventory/.agents/skills/.gitkeep
 
 # OS and editor files
