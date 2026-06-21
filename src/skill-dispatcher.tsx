@@ -2,7 +2,7 @@
 import { readdir, readFile, mkdir, lstat, readlink, realpath, symlink } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { render, Box, Text, useApp, useInput } from "ink";
 
 // --- Types ---
@@ -229,6 +229,12 @@ function App({ skills, cwd = process.cwd() }: { skills: Skill[]; cwd?: string })
     [selectedNames, skills],
   );
 
+  useEffect(() => {
+    if (stage === "done") {
+      exit();
+    }
+  }, [stage, exit]);
+
   useInput((input, key) => {
     if (key.escape || input === "q") {
       exit();
@@ -379,7 +385,6 @@ function SummaryScreen({ results }: { results: LinkResult[] }) {
           {statusMarker(result.status)} {result.message}
         </Text>
       ))}
-      <Text dimColor>Press q or Escape to exit.</Text>
     </Box>
   );
 }
