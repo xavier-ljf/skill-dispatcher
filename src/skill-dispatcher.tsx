@@ -184,7 +184,9 @@ function App({ skills, cwd = process.cwd() }: { skills: Skill[]; cwd?: string })
   const [stage, setStage] = useState<Stage>("select");
   const [cursor, setCursor] = useState(0);
   const [selectedNames, setSelectedNames] = useState<Set<string>>(() => new Set());
-  const [destinationInput, setDestinationInput] = useState("");
+  const [destinationInput, setDestinationInput] = useState(() =>
+    path.join(cwd, ".agents", "skills"),
+  );
   const [results, setResults] = useState<LinkResult[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -271,7 +273,10 @@ function App({ skills, cwd = process.cwd() }: { skills: Skill[]; cwd?: string })
         <SelectScreen skills={skills} cursor={cursor} selectedNames={selectedNames} />
       )}
       {stage === "destination" && (
-        <DestinationScreen value={destinationInput} error={error} />
+        <>
+          <SelectScreen skills={skills} cursor={cursor} selectedNames={selectedNames} readOnly />
+          <DestinationScreen value={destinationInput} error={error} />
+        </>
       )}
       {stage === "working" && <Text>Linking selected skills...</Text>}
       {stage === "done" && <SummaryScreen results={results} />}
@@ -283,20 +288,22 @@ function SelectScreen({
   skills,
   cursor,
   selectedNames,
+  readOnly = false,
 }: {
   skills: Skill[];
   cursor: number;
   selectedNames: Set<string>;
+  readOnly?: boolean;
 }) {
   return (
     <Box flexDirection="column">
-      <Text>Select skills with Space, then press Enter.</Text>
+      <Text>{readOnly ? "Selected skills:" : "Select skills with Space, then press Enter."}</Text>
       {skills.map((skill, index) => {
         const focused = index === cursor;
         const selected = selectedNames.has(skill.name);
         return (
-          <Text key={skill.name} color={focused ? "cyan" : undefined}>
-            {focused ? ">" : " "} [{selected ? "x" : " "}] {skill.name}
+          <Text key={skill.name} color={focused && !readOnly ? "cyan" : undefined}>
+            {focused && !readOnly ? ">" : " "} [{selected ? "x" : " "}] {skill.name}
           </Text>
         );
       })}
@@ -308,7 +315,7 @@ function DestinationScreen({ value, error }: { value: string; error: string | nu
   return (
     <Box flexDirection="column">
       <Text>Destination path:</Text>
-      <Text>{value || " "}</Text>
+      <Text>{value}<Text color="cyan">▋</Text></Text>
       {error && <Text color="red">{error}</Text>}
       <Text dimColor>Press Enter to link selected skills.</Text>
     </Box>
