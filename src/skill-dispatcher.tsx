@@ -213,6 +213,63 @@ function getErrorMessage(error: unknown): string {
 
 type Stage = "select" | "destination" | "working" | "done";
 
+const MAX_VIEWPORT_LINES = 20;
+
+function lineCountForSkill(
+  skills: Skill[],
+  index: number,
+  hasSources: boolean,
+): number {
+  if (!hasSources) return 1;
+  if (index === 0) return 2;
+  return skills[index - 1].source !== skills[index].source ? 2 : 1;
+}
+
+// Compute a window [start, end) around the cursor whose total rendered lines
+// (skill rows plus group headers) fit within maxLines. Expansion alternates
+// backward/forward to keep the cursor roughly centered.
+function computeViewport(
+  skills: Skill[],
+  cursor: number,
+  maxLines: number,
+  hasSources: boolean,
+): { start: number; end: number } {
+  let start = cursor;
+  let end = cursor + 1;
+  let lines = lineCountForSkill(skills, cursor, hasSources);
+  let preferBack = true;
+
+  while (lines < maxLines) {
+    let expanded = false;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const tryBack = attempt === 0 ? preferBack : !preferBack;
+      if (tryBack && start > 0) {
+        const newLines =
+          lines + lineCountForSkill(skills, start - 1, hasSources);
+        if (newLines <= maxLines) {
+          start--;
+          lines = newLines;
+          expanded = true;
+          preferBack = !preferBack;
+          break;
+        }
+      } else if (!tryBack && end < skills.length) {
+        const newLines = lines + lineCountForSkill(skills, end, hasSources);
+        if (newLines <= maxLines) {
+          end++;
+          lines = newLines;
+          expanded = true;
+          preferBack = !preferBack;
+          break;
+        }
+      }
+    }
+    if (!expanded) break;
+  }
+
+  return { start, end };
+}
+
 function App({ skills, cwd = process.cwd() }: { skills: Skill[]; cwd?: string }) {
   const { exit } = useApp();
   const [stage, setStage] = useState<Stage>("select");
@@ -234,6 +291,15 @@ function App({ skills, cwd = process.cwd() }: { skills: Skill[]; cwd?: string })
       exit();
     }
   }, [stage, exit]);
+
+  const hasSources = useMemo(
+    () => skills.some((skill) => skill.source),
+    [skills],
+  );
+  const { start, end } = useMemo(
+    () => computeViewport(skills, cursor, MAX_VIEWPORT_LINES, hasSources),
+    [skills, cursor, hasSources],
+  );
 
   useInput((input, key) => {
     if (key.escape || input === "q") {
@@ -310,11 +376,17 @@ function App({ skills, cwd = process.cwd() }: { skills: Skill[]; cwd?: string })
   return (
     <Box flexDirection="column" gap={1}>
       {stage === "select" && (
-        <SelectScreen skills={skills} cursor={cursor} selectedNames={selectedNames} />
+        <SelectScreen
+          skills={skills}
+          cursor={cursor}
+          selectedNames={selectedNames}
+          startIndex={start}
+          endIndex={end}
+        />
       )}
       {stage === "destination" && (
         <>
-          <SelectScreen skills={skills} cursor={cursor} selectedNames={selectedNames} readOnly />
+          <Text>Selected skills: {selectedSkills.map((skill) => skill.name).join(", ")}</Text>
           <DestinationScreen value={destinationInput} error={error} />
         </>
       )}
@@ -328,19 +400,27 @@ function SelectScreen({
   skills,
   cursor,
   selectedNames,
-  readOnly = false,
+  startIndex = 0,
+  endIndex = skills.length,
 }: {
   skills: Skill[];
   cursor: number;
   selectedNames: Set<string>;
-  readOnly?: boolean;
+  startIndex?: number;
+  endIndex?: number;
 }) {
   const hasSources = skills.some((skill) => skill.source);
+  const hiddenAbove = startIndex;
+  const hiddenBelow = skills.length - endIndex;
 
   return (
     <Box flexDirection="column">
-      <Text>{readOnly ? "Selected skills:" : "Select skills with Space, then press Enter."}</Text>
-      {skills.map((skill, index) => {
+      <Text>Select skills with Space, then press Enter.</Text>
+      {hiddenAbove > 0 && (
+        <Text dimColor>↑ {hiddenAbove} more above</Text>
+      )}
+      {skills.slice(startIndex, endIndex).map((skill, offset) => {
+        const index = startIndex + offset;
         const focused = index === cursor;
         const selected = selectedNames.has(skill.name);
         const showHeader =
@@ -352,12 +432,15 @@ function SelectScreen({
             {showHeader && (
               <Text color="yellow">{skill.source ?? "(ungrouped)"}</Text>
             )}
-            <Text color={focused && !readOnly ? "cyan" : undefined}>
-              {focused && !readOnly ? ">" : " "} {hasSources ? "  " : ""}[{selected ? "x" : " "}] {skill.name}
+            <Text color={focused ? "cyan" : undefined}>
+              {focused ? ">" : " "} {hasSources ? "  " : ""}[{selected ? "x" : " "}] {skill.name}
             </Text>
           </React.Fragment>
         );
       })}
+      {hiddenBelow > 0 && (
+        <Text dimColor>↓ {hiddenBelow} more below</Text>
+      )}
     </Box>
   );
 }
