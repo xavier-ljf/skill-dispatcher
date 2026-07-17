@@ -39,22 +39,10 @@ When the lock file is present, skills in the selection list are grouped under th
 
 The tool never copies skill directories.
 
-## Development
-
-Install dependencies:
+## Usage
 
 ```shell
-npm install
+npm install && npm run build && npm link
 ```
 
-Build:
-
-```shell
-npm run build
-```
-
-Run the built CLI:
-
-```shell
-node dist/skill-dispatcher.js
-```
+Then run `skill-dispatcher` from any project.
